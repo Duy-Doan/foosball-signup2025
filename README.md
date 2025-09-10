@@ -1,0 +1,1 @@
+# foosball-signup2025
