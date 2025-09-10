@@ -1,0 +1,290 @@
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Foosball Sign Up</title>
+  <style>
+    body {
+      background: radial-gradient(circle at top, #2a0a44, #0a0612);
+      color: #fff;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    h1 {
+      text-align: center;
+      margin: 10px 0 30px;
+      color: #f0d67f;
+    }
+    .teams {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      max-width: 800px;
+    }
+    .team-card {
+      border: 1px solid #5a3d8a;
+      border-radius: 12px;
+      background: rgba(150, 80, 200, 0.15);
+      padding: 20px 30px;
+      min-width: 160px;
+      text-align: center;
+      font-size: 16px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+    .team-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+    }
+    .team-card.locked {
+      background: rgba(100, 255, 100, 0.2);
+      border: 1px solid #00ff88;
+      cursor: not-allowed;
+    }
+    .team-card strong {
+      color: #d29eff;
+    }
+    .settings-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .settings-btn:hover {
+      transform: rotate(90deg);
+      color: gold;
+    }
+    .admin-page {
+      display: none;
+      width: 100%;
+    }
+    table {
+      border-collapse: collapse;
+      width: 90%;
+      margin: 20px auto;
+      background: rgba(50, 20, 80, 0.8);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    table, th, td {
+      border: 1px solid #d29eff;
+      text-align: center;
+      padding: 10px;
+    }
+    th {
+      background: rgba(210, 158, 255, 0.4);
+    }
+    .admin-controls {
+      text-align: center;
+      margin: 20px;
+    }
+    .admin-controls button {
+      background: #5a3d8a;
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .admin-controls button:hover {
+      background: #8a5df5;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="title">Giải Đấu Bi Lắc 2025 Arup Việt Nam</h1>
+
+  <!-- Nút Setting -->
+  <button class="settings-btn" id="settingsBtn">⚙️</button>
+
+  <!-- Giao diện người chơi -->
+  <div class="teams" id="teamsContainer"></div>
+
+  <!-- Giao diện Admin -->
+  <div class="admin-page" id="adminPage">
+    <h1>📊 Thống kê đăng ký</h1>
+    <p style="text-align:center">
+      Tổng số đội: <span id="teamCount">0</span> | 
+      Tổng số thành viên: <span id="memberCount">0</span>
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Tên đội</th>
+          <th>Thành viên</th>
+          <th>Thời gian đăng ký</th>
+        </tr>
+      </thead>
+      <tbody id="statsTableBody"></tbody>
+    </table>
+    <div class="admin-controls">
+      <button id="resetBtn">🔄 Reset toàn bộ</button>
+      <button id="exitAdminBtn">🚪 Thoát Admin</button>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+  <script>
+    // 🔑 Cấu hình Firebase (cần thay bằng thông tin thật khi triển khai)
+    const firebaseConfig = {
+      apiKey: "AIzaSyDUMMY-KEY-FOR-EXAMPLE",
+      authDomain: "foosball-sign-up.firebaseapp.com",
+      databaseURL: "https://foosball-sign-up-default-rtdb.asia-southeast1.firebasedatabase.app/",
+      projectId: "foosball-sign-up",
+      storageBucket: "foosball-sign-up.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const PASSWORD = "0000";
+    let isAdmin = false;
+    const teamCount = 8;
+
+    const teamsContainer = document.getElementById('teamsContainer');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const adminPage = document.getElementById('adminPage');
+    const title = document.getElementById('title');
+
+    const teamCountEl = document.getElementById('teamCount');
+    const memberCountEl = document.getElementById('memberCount');
+    const statsTableBody = document.getElementById('statsTableBody');
+    const resetBtn = document.getElementById('resetBtn');
+    const exitAdminBtn = document.getElementById('exitAdminBtn');
+
+    function formatDateTime(date) {
+      const d = new Date(date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const seconds = String(d.getSeconds()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    }
+
+    let teamsData = [];
+
+    db.ref("teamsData").on("value", snapshot => {
+      teamsData = snapshot.val() || [];
+      if (teamsData.length === 0) {
+        for (let i = 1; i <= teamCount; i++) {
+          teamsData.push({ id: i, name: `Đội ${i}`, members: "", locked: false, time: "" });
+        }
+        saveData();
+      }
+      renderTeams();
+      if (isAdmin) renderStats();
+    });
+
+    function saveData() {
+      db.ref("teamsData").set(teamsData);
+    }
+
+    function renderTeams() {
+      teamsContainer.innerHTML = "";
+      teamsData.forEach((team, i) => {
+        const div = document.createElement("div");
+        div.className = "team-card" + (team.locked ? " locked" : "");
+        div.innerHTML = `<strong>${team.name}</strong><br>${team.members || "Click để nhập"}`;
+        div.addEventListener('click', () => {
+          if (team.locked && !isAdmin) {
+            alert("Ô này đã bị khóa. Chỉ Admin mới có thể chỉnh sửa.");
+            return;
+          }
+          const teamName = prompt("Nhập tên đội:", team.name);
+          if (!teamName) return;
+          const members = prompt("Nhập tên các thành viên (ngăn cách bởi dấu ,):", team.members);
+          if (members === null) return;
+          teamsData[i].name = teamName;
+          teamsData[i].members = members;
+          const confirmSave = confirm("Bạn xác nhận tên đội và thành viên?");
+          if (confirmSave && !isAdmin) {
+            teamsData[i].locked = true;
+            teamsData[i].time = formatDateTime(new Date());
+          }
+          saveData();
+        });
+        teamsContainer.appendChild(div);
+      });
+    }
+
+    function renderStats() {
+      const registeredTeams = teamsData.filter(t => t.members.trim() !== "");
+      teamCountEl.textContent = registeredTeams.length;
+      let totalMembers = 0;
+      registeredTeams.forEach(t => {
+        totalMembers += t.members.split(",").filter(m => m.trim() !== "").length;
+      });
+      memberCountEl.textContent = totalMembers;
+
+      statsTableBody.innerHTML = "";
+      teamsData.forEach(t => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${t.id}</td>
+          <td>${t.name}</td>
+          <td>${t.members || "-"}</td>
+          <td>${t.time || "-"}</td>
+        `;
+        statsTableBody.appendChild(row);
+      });
+    }
+
+    settingsBtn.addEventListener('click', () => {
+      if (!isAdmin) {
+        const inputPass = prompt("Nhập mật khẩu Admin:");
+        if (inputPass === PASSWORD) {
+          isAdmin = true;
+          teamsContainer.style.display = "none";
+          title.style.display = "none";
+          adminPage.style.display = "block";
+          renderStats();
+        } else {
+          alert("Sai mật khẩu ❌");
+        }
+      } else {
+        alert("Bạn đang ở chế độ Admin.");
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (!isAdmin) return;
+      if (confirm("Bạn có chắc muốn reset toàn bộ danh sách đội?")) {
+        teamsData = [];
+        for (let i = 1; i <= teamCount; i++) {
+          teamsData.push({ id: i, name: `Đội ${i}`, members: "", locked: false, time: "" });
+        }
+        saveData();
+      }
+    });
+
+    exitAdminBtn.addEventListener('click', () => {
+      isAdmin = false;
+      adminPage.style.display = "none";
+      title.style.display = "block";
+      teamsContainer.style.display = "flex";
+      renderTeams();
+    });
+  </script>
+</body>
+</html>
